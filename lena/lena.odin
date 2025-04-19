@@ -8,7 +8,6 @@ import "core:math"
 import "core:time"
 import "core:bytes"
 import "core:image/png"
-import "core:fmt"
 
 import "vendor:stb/truetype"
 
