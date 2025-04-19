@@ -8,6 +8,7 @@ import "core:math"
 import "core:time"
 import "core:bytes"
 import "core:image/png"
+import "core:fmt"
 
 import "vendor:stb/truetype"
 
@@ -306,9 +307,42 @@ create_image_from_png :: proc(blob: []u8, allocator := context.allocator) -> Ima
 
 	dat := bytes.buffer_to_bytes(&the_png.pixels)
 	img := create_image(the_png.width, the_png.height, allocator)
-	copy(img.pixels, dat)
+	if the_png.channels == 1 {
+		copy(img.pixels, dat)
+	} else if the_png.channels == 3 {
+		pixels := mem.slice_data_cast([][3]u8, dat)
+		for pixel, idx in pixels do img.pixels[idx] = quantize({pixel[0],pixel[1],pixel[2]})
+	} else if the_png.channels == 4 {
+		pixels := mem.slice_data_cast([][4]u8, dat)
+		for pixel, idx in pixels {
+			if pixel[3] < 255 {
+				img.pixels[idx] = ctx.alpha_index
+			} else {
+				img.pixels[idx] = quantize({pixel[0],pixel[1],pixel[2]})
+			}
+		}
+	}
 
 	return img
+}
+
+quantize :: proc(pixel : [3]u8) -> u8 {
+	cur_max := max(int)
+	cur_idx := ctx.alpha_index
+	for bcolor, cidx in ctx.palette {
+		if u8(cidx) == ctx.alpha_index do continue
+		color := transmute([4]u8) bcolor
+		diff := 0
+		for i in 0..<3 {
+			tdiff := int(pixel[i]) - int(color[i])
+			diff += tdiff * tdiff
+		}
+		if diff <= cur_max {
+			cur_max = diff
+			cur_idx = u8(cidx)
+		}
+	}
+	return cur_idx
 }
 
 destroy_image :: proc(img: Image) {
